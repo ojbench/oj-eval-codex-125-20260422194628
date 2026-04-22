@@ -1,37 +1,31 @@
+// Optimized solution: on-the-fly DSU with hashing to avoid sorting
 #include <bits/stdc++.h>
 using namespace std;
 
 struct DSU {
     vector<int> p, r;
-    DSU() {}
-    explicit DSU(size_t n) { init(n); }
-    void init(size_t n) {
-        p.resize(n);
-        r.assign(n, 0);
-        iota(p.begin(), p.end(), 0);
+    DSU() { p.reserve(1); r.reserve(1); }
+    int add() {
+        int id = (int)p.size();
+        p.push_back(id);
+        r.push_back(0);
+        return id;
     }
     int find(int x) {
         int root = x;
         while (p[root] != root) root = p[root];
-        while (p[x] != x) {
-            int nx = p[x];
-            p[x] = root;
-            x = nx;
-        }
+        while (p[x] != x) { int nx = p[x]; p[x] = root; x = nx; }
         return root;
     }
-    bool unite(int a, int b) {
+    void unite(int a, int b) {
         a = find(a); b = find(b);
-        if (a == b) return false;
+        if (a == b) return;
         if (r[a] < r[b]) swap(a, b);
         p[b] = a;
         if (r[a] == r[b]) r[a]++;
-        return true;
     }
     bool same(int a, int b) { return find(a) == find(b); }
 };
-
-struct Constraint { int a; int b; int e; };
 
 static inline bool fastReadInt(int &out) {
     int c = getchar_unlocked();
@@ -45,66 +39,50 @@ static inline bool fastReadInt(int &out) {
 }
 
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-
-    // Use fast C IO because of huge input volume
-    // Read t using fastReadInt to avoid sync issues
-    int t; 
-    if (!fastReadInt(t)) return 0;
-    string out; out.reserve((size_t)t * 4);
+    int t; if (!fastReadInt(t)) return 0;
+    vector<char> answers; answers.reserve(t);
     while (t--) {
         int n; fastReadInt(n);
-        vector<Constraint> eqs; eqs.reserve(n);
-        vector<Constraint> neqs; neqs.reserve(64);
-        eqs.clear(); neqs.clear();
-        eqs.shrink_to_fit(); neqs.shrink_to_fit(); // ensure capacity set above applies
-        eqs.reserve(n);
-        neqs.reserve(n / 8 + 8);
+        DSU dsu;
+        dsu.p.reserve((size_t)min(4*n, 10000000));
+        dsu.r.reserve((size_t)min(4*n, 10000000));
+        unordered_map<int,int> id;
+        id.reserve((size_t)min(4*n, 10000000));
+        id.max_load_factor(0.7f);
 
-        vector<pair<int,int>> pairs; pairs.reserve(n);
-        pairs.clear();
-
-        eqs.reserve(n);
-        for (int i = 0; i < n; ++i) {
-            int a, b, e; fastReadInt(a); fastReadInt(b); fastReadInt(e);
-            if (e == 1) {
-                eqs.push_back({a, b, e});
-            } else {
-                neqs.push_back({a, b, e});
-            }
-            pairs.emplace_back(a, b);
-        }
-
-        // Coordinate compression
-        vector<int> vals; vals.reserve(pairs.size() * 2);
-        for (auto &pr : pairs) { vals.push_back(pr.first); vals.push_back(pr.second); }
-        sort(vals.begin(), vals.end());
-        vals.erase(unique(vals.begin(), vals.end()), vals.end());
-        auto getId = [&](int x) {
-            return (int)(lower_bound(vals.begin(), vals.end(), x) - vals.begin());
+        auto getId = [&](int x) -> int {
+            auto it = id.find(x);
+            if (it != id.end()) return it->second;
+            int nid = dsu.add();
+            id.emplace(x, nid);
+            return nid;
         };
 
-        DSU dsu(vals.size());
-
-        // Merge equalities first
-        for (const auto &cns : eqs) {
-            int x = getId(cns.a), y = getId(cns.b);
-            dsu.unite(x, y);
+        vector<pair<int,int>> neqs; neqs.reserve(n/2 + 8);
+        for (int i = 0; i < n; ++i) {
+            int a, b, e; fastReadInt(a); fastReadInt(b); fastReadInt(e);
+            int ia = getId(a), ib = getId(b);
+            if (e == 1) {
+                dsu.unite(ia, ib);
+            } else {
+                neqs.emplace_back(ia, ib);
+            }
         }
 
-        // Check inequalities
         bool ok = true;
-        for (const auto &cns : neqs) {
-            int x = getId(cns.a), y = getId(cns.b);
-            if (dsu.same(x, y)) { ok = false; break; }
+        for (const auto &pr : neqs) {
+            if (dsu.same(pr.first, pr.second)) { ok = false; break; }
         }
-
-        if (ok) out += "YES\n"; else out += "NO\n";
+        answers.push_back(ok ? 'Y' : 'N');
     }
 
-    // Use fwrite for faster single output
-    fwrite(out.data(), 1, out.size(), stdout);
+    for (char c : answers) {
+        if (c == 'Y') {
+            putchar_unlocked('Y'); putchar_unlocked('E'); putchar_unlocked('S');
+        } else {
+            putchar_unlocked('N'); putchar_unlocked('O');
+        }
+        putchar_unlocked('\n');
+    }
     return 0;
 }
-
